@@ -21,7 +21,6 @@ class TicketController extends Controller
     {
         $this->ticketRepo = $ticketRepo;
         $this->notificationRepo = $notificationRepo;
-        $this->middleware('auth:sanctum');
     }
 
     /**

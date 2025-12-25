@@ -23,7 +23,6 @@ class DashboardController extends Controller
         $this->ticketRepo = $ticketRepo;
         $this->messageRepo = $messageRepo;
         $this->userRepo = $userRepo;
-        $this->middleware('auth:sanctum');
     }
 
     /**

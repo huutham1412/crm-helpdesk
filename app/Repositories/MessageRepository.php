@@ -66,7 +66,7 @@ class MessageRepository extends BaseRepository
             $query->where('is_internal', false);
         }
 
-        return $query->latest()->paginate($perPage);
+        return $query->oldest()->paginate($perPage);
     }
 
     /**
@@ -81,7 +81,7 @@ class MessageRepository extends BaseRepository
             $query->where('is_internal', false);
         }
 
-        return $query->latest()->get();
+        return $query->oldest()->get();
     }
 
     /**

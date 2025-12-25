@@ -51,14 +51,6 @@ class UserRepository extends BaseRepository
     }
 
     /**
-     * Get online users
-     */
-    public function online(): Collection
-    {
-        return $this->model->where('is_online', true)->get();
-    }
-
-    /**
      * Get paginated users with filters
      */
     public function paginateWithFilters(
@@ -144,7 +136,6 @@ class UserRepository extends BaseRepository
             'total' => $this->model->count(),
             'cskh' => $this->model->role(['Admin', 'CSKH'])->count(),
             'users' => $this->model->role('User')->count(),
-            'online' => $this->model->where('is_online', true)->count(),
         ];
     }
 

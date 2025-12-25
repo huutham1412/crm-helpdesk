@@ -20,7 +20,6 @@ class MessageController extends Controller
     {
         $this->messageRepo = $messageRepo;
         $this->notificationRepo = $notificationRepo;
-        $this->middleware('auth:sanctum');
     }
 
     /**
@@ -48,7 +47,7 @@ class MessageController extends Controller
 
         // Regular users don't see internal messages
         $includeInternal = $user->isCsKH();
-        $messages = $this->messageRepo->paginateForTicket($ticketId, 50, $includeInternal);
+        $messages = $this->messageRepo->paginateForTicket($ticketId, $includeInternal, 50);
 
         return response()->json([
             'success' => true,
