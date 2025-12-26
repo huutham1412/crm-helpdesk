@@ -8,6 +8,7 @@ use App\Http\Requests\UpdateRoleRequest;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Spatie\Permission\Models\Role;
+use App\Models\User;
 
 class RoleController extends Controller
 {
@@ -16,7 +17,10 @@ class RoleController extends Controller
      */
     public function index(): JsonResponse
     {
-        $roles = Role::withCount('users')->orderBy('name')->get();
+        $roles = Role::orderBy('name')->get()->map(function ($role) {
+            $role->users_count = User::role($role->name)->count();
+            return $role;
+        });
 
         return response()->json([
             'success' => true,
@@ -29,7 +33,7 @@ class RoleController extends Controller
      */
     public function show(string $id): JsonResponse
     {
-        $role = Role::with('users', 'permissions')->find($id);
+        $role = Role::find($id);
 
         if (!$role) {
             return response()->json([
@@ -37,6 +41,11 @@ class RoleController extends Controller
                 'message' => 'Role not found',
             ], 404);
         }
+
+        // Get users with this role
+        $users = User::role($role->name)->get(['id', 'name', 'email', 'created_at']);
+        $role->users = $users;
+        $role->users_count = $users->count();
 
         return response()->json([
             'success' => true,
@@ -117,7 +126,8 @@ class RoleController extends Controller
         }
 
         // Check if role has users
-        if ($role->users()->count() > 0) {
+        $userCount = User::role($role->name)->count();
+        if ($userCount > 0) {
             return response()->json([
                 'success' => false,
                 'message' => 'Cannot delete role with assigned users',
