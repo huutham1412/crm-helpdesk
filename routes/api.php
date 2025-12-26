@@ -7,6 +7,8 @@ use App\Http\Controllers\Api\V1\MessageController;
 use App\Http\Controllers\Api\V1\CategoryController;
 use App\Http\Controllers\Api\V1\DashboardController;
 use App\Http\Controllers\Api\V1\NotificationController;
+use App\Http\Controllers\Api\V1\UserController;
+use App\Http\Controllers\Api\V1\RoleController;
 
 /*
 |--------------------------------------------------------------------------
@@ -51,13 +53,6 @@ Route::prefix('v1')->group(function () {
         // Category routes
         Route::get('/categories', [CategoryController::class, 'index']);
 
-        // Admin only category routes
-        Route::middleware('role:Admin')->group(function () {
-            Route::post('/categories', [CategoryController::class, 'store']);
-            Route::put('/categories/{id}', [CategoryController::class, 'update']);
-            Route::delete('/categories/{id}', [CategoryController::class, 'destroy']);
-        });
-
         // Dashboard routes
         Route::get('/dashboard/statistics', [DashboardController::class, 'statistics']);
 
@@ -75,16 +70,25 @@ Route::prefix('v1')->group(function () {
 
         // User routes (CSKH/Admin)
         Route::middleware('role:CSKH|Admin')->group(function () {
-            Route::get('/users/cskh-list', [\App\Http\Controllers\Api\V1\UserController::class, 'cskhList']);
+            Route::get('/users/cskh-list', [UserController::class, 'cskhList']);
         });
 
-        // User management routes (Admin only)
+        // ==================== ADMIN ONLY ROUTES ====================
         Route::middleware('role:Admin')->group(function () {
-            Route::get('/users', [\App\Http\Controllers\Api\V1\UserController::class, 'index']);
-            Route::get('/users/statistics', [\App\Http\Controllers\Api\V1\UserController::class, 'statistics']);
-            Route::get('/users/{id}', [\App\Http\Controllers\Api\V1\UserController::class, 'show']);
-            Route::put('/users/{id}', [\App\Http\Controllers\Api\V1\UserController::class, 'update']);
-            Route::delete('/users/{id}', [\App\Http\Controllers\Api\V1\UserController::class, 'destroy']);
+            // User management
+            Route::apiResource('users', UserController::class);
+            Route::put('/users/{user}/roles', [UserController::class, 'assignRoles']);
+            Route::put('/users/{user}/status', [UserController::class, 'toggleStatus']);
+            Route::get('/users/statistics', [UserController::class, 'statistics']);
+
+            // Role management
+            Route::apiResource('roles', RoleController::class);
+            Route::get('/roles/list', [RoleController::class, 'list']);
+
+            // Category management
+            Route::post('/categories', [CategoryController::class, 'store']);
+            Route::put('/categories/{id}', [CategoryController::class, 'update']);
+            Route::delete('/categories/{id}', [CategoryController::class, 'destroy']);
         });
     });
 });
