@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api\V1;
 
+use App\Jobs\SendTelegramNotification;
 use App\Http\Controllers\Controller;
 use App\Models\Notification;
 use App\Models\Ticket;
@@ -126,6 +127,14 @@ class MessageController extends Controller
                     $ticketId,
                     $request->message
                 );
+            }
+
+            // Gửi thông báo Telegram khi có tin nhắn mới từ user (chỉ notify khi user gửi, không spam khi CSKH trả lời)
+            if ($user->id === $ticket->user_id) {
+                SendTelegramNotification::dispatch($ticket->load('user'), 'new_message', [
+                    'message' => $request->message,
+                    'sender_name' => $user->name,
+                ]);
             }
         }
 

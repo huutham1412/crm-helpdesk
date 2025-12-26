@@ -5,6 +5,7 @@
 .env.production
 .phpactor.json
 .phpunit.result.cache
+TELEGRAM_SETUP.md
 /.fleet
 /.idea
 /.nova

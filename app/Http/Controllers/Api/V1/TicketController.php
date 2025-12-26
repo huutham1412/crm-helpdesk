@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api\V1;
 
+use App\Jobs\SendTelegramNotification;
 use App\Http\Controllers\Controller;
 use App\Models\Message;
 use App\Models\Notification;
@@ -89,6 +90,10 @@ class TicketController extends Controller
             $ticket->ticket_number,
             $ticket->subject
         );
+
+        // Gửi thông báo Telegram (async qua queue)
+        $notificationType = $ticket->priority === 'urgent' ? 'urgent_ticket' : 'new_ticket';
+        SendTelegramNotification::dispatch($ticket, $notificationType);
 
         return response()->json([
             'success' => true,
@@ -186,6 +191,12 @@ class TicketController extends Controller
                     $ticket->status
                 );
             }
+
+            // Gửi thông báo Telegram khi status thay đổi
+            SendTelegramNotification::dispatch($ticket, 'status_changed', [
+                'old_status' => $oldStatus,
+                'new_status' => $ticket->status,
+            ]);
         }
 
         return response()->json([
@@ -232,6 +243,9 @@ class TicketController extends Controller
                 $ticket->ticket_number
             );
         }
+
+        // Gửi thông báo Telegram khi ticket được assign
+        SendTelegramNotification::dispatch($ticket, 'ticket_assigned');
 
         return response()->json([
             'success' => true,
