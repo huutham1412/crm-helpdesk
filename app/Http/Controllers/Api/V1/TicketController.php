@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api\V1;
 
 use App\Jobs\SendTelegramNotification;
+use App\Events\TicketUpdated;
 use App\Http\Controllers\Controller;
 use App\Models\Message;
 use App\Models\Notification;
@@ -12,6 +13,7 @@ use App\Repositories\NotificationRepository;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Support\Facades\Log;
 
 class TicketController extends Controller
 {
@@ -197,6 +199,13 @@ class TicketController extends Controller
                 'old_status' => $oldStatus,
                 'new_status' => $ticket->status,
             ]);
+
+            // Broadcast realtime event for ticket update
+            try {
+                broadcast(new TicketUpdated($ticket));
+            } catch (\Exception $e) {
+                Log::error('Failed to broadcast TicketUpdated event: ' . $e->getMessage());
+            }
         }
 
         return response()->json([

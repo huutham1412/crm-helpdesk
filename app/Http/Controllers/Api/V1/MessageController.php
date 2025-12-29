@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api\V1;
 
 use App\Jobs\SendTelegramNotification;
+use App\Events\NewMessage;
 use App\Http\Controllers\Controller;
 use App\Models\Notification;
 use App\Models\Ticket;
@@ -11,6 +12,7 @@ use App\Repositories\NotificationRepository;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Support\Facades\Log;
 
 class MessageController extends Controller
 {
@@ -136,6 +138,13 @@ class MessageController extends Controller
                     'sender_name' => $user->name,
                 ]);
             }
+
+            // Broadcast realtime event for new message
+            try {
+                broadcast(new NewMessage($message, $ticket));
+            } catch (\Exception $e) {
+                Log::error('Failed to broadcast NewMessage event: ' . $e->getMessage());
+            }
         }
 
         return response()->json([
@@ -145,5 +154,40 @@ class MessageController extends Controller
                 'message' => $message->load('user'),
             ],
         ], 201);
+    }
+
+    /**
+     * Broadcast typing indicator
+     */
+    public function typing(Request $request, $ticketId): JsonResponse
+    {
+        $user = $request->user();
+        $ticket = Ticket::find($ticketId);
+
+        if (!$ticket) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Ticket not found',
+            ], 404);
+        }
+
+        // Authorization check
+        if (!$user->isCsKH() && $ticket->user_id !== $user->id) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Unauthorized',
+            ], 403);
+        }
+
+        // Broadcast typing event
+        try {
+            broadcast(new \App\Events\UserTyping($ticketId, $user->id, $user->name, true));
+        } catch (\Exception $e) {
+            Log::error('Failed to broadcast UserTyping event: ' . $e->getMessage());
+        }
+
+        return response()->json([
+            'success' => true,
+        ]);
     }
 }

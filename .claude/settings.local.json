@@ -3,7 +3,9 @@
     "allow": [
       "Bash(npm run dev:*)",
       "Bash(npm install:*)",
-      "Bash(php artisan route:list:*)"
+      "Bash(php artisan route:list:*)",
+      "Bash(\"D:/apps/laragon/laragon/bin/php/php-8.2.30-nts-Win32-vs16-x64/php.exe\":*)",
+      "Bash(\"D:/apps/laragon/laragon/bin/php/php-8.2.30-nts-Win32-vs16-x64/php.exe\" artisan reverb:start)"
     ]
   }
 }

@@ -1,12 +1,14 @@
 <?php
 
 use Illuminate\Support\Facades\Route;
+use Illuminate\Support\Facades\Broadcast;
 use App\Http\Controllers\Api\V1\AuthController;
 use App\Http\Controllers\Api\V1\TicketController;
 use App\Http\Controllers\Api\V1\MessageController;
 use App\Http\Controllers\Api\V1\CategoryController;
 use App\Http\Controllers\Api\V1\DashboardController;
 use App\Http\Controllers\Api\V1\NotificationController;
+use App\Http\Controllers\Api\V1\BroadcastController;
 use App\Http\Controllers\Api\V1\UserController;
 use App\Http\Controllers\Api\V1\RoleController;
 
@@ -72,6 +74,12 @@ Route::prefix('v1')->group(function () {
         Route::middleware('role:CSKH|Admin')->group(function () {
             Route::get('/users/cskh-list', [UserController::class, 'cskhList']);
         });
+
+        // ==================== TYPING INDICATOR ROUTE ====================
+        Route::post('/tickets/{ticket}/typing', [MessageController::class, 'typing']);
+
+        // ==================== BROADCASTING AUTH ROUTE ====================
+        Route::post('/broadcasting/auth', [BroadcastController::class, 'authenticate']);
 
         // ==================== ADMIN ONLY ROUTES ====================
         Route::middleware('role:Admin')->group(function () {

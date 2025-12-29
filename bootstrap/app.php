@@ -15,6 +15,9 @@ return Application::configure(basePath: dirname(__DIR__))
     ->withMiddleware(function (Middleware $middleware) {
         $middleware->api(prepend: []);
 
+        // Enable CORS globally (array format)
+        $middleware->use([\Illuminate\Http\Middleware\HandleCors::class]);
+
         // Register Spatie role middleware
         $middleware->alias([
             'role' => \Spatie\Permission\Middleware\RoleMiddleware::class,
