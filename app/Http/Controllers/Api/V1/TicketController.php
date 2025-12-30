@@ -36,6 +36,8 @@ class TicketController extends Controller
             'priority' => $request->priority,
             'category_id' => $request->category_id,
             'search' => $request->search,
+            'date_from' => $request->date_from,
+            'date_to' => $request->date_to,
         ];
 
         $tickets = $this->ticketRepo->paginateForUser($request->user(), 20, $filters);

@@ -56,7 +56,9 @@ class UserRepository extends BaseRepository
     public function paginateWithFilters(
         int $perPage = 20,
         ?string $search = null,
-        ?string $role = null
+        ?string $role = null,
+        ?string $dateFrom = null,
+        ?string $dateTo = null
     ): LengthAwarePaginator {
         $query = $this->model->with('roles', 'permissions');
 
@@ -71,6 +73,14 @@ class UserRepository extends BaseRepository
             $query->whereHas('roles', function ($q) use ($role) {
                 $q->where('name', $role);
             });
+        }
+
+        // Date range filter
+        if ($dateFrom && $dateFrom !== '') {
+            $query->whereDate('created_at', '>=', $dateFrom);
+        }
+        if ($dateTo && $dateTo !== '') {
+            $query->whereDate('created_at', '<=', $dateTo);
         }
 
         return $query->latest()->paginate($perPage);
