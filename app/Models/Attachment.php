@@ -17,6 +17,8 @@ class Attachment extends Model
         'file_type',
         'file_size',
         'file_extension',
+        'cloudinary_public_id',
+        'cloudinary_url',
     ];
 
     /**
@@ -64,6 +66,12 @@ class Attachment extends Model
      */
     public function getUrlAttribute(): string
     {
+        // Ưu tiên dùng Cloudinary URL nếu có
+        if (!empty($this->cloudinary_url)) {
+            return $this->cloudinary_url;
+        }
+
+        // Fallback cho local storage (để tương thích với data cũ)
         $url = Storage::url($this->file_path);
         // Return full URL if not already absolute
         if (!str_starts_with($url, 'http')) {

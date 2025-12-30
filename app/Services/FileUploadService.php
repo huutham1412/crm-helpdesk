@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\Attachment;
+use Cloudinary\Cloudinary;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
 use Exception;
@@ -52,6 +53,24 @@ class FileUploadService
         'rar' => 'archive',
     ];
 
+    private ?Cloudinary $cloudinary = null;
+
+    public function __construct()
+    {
+        // Initialize Cloudinary nếu credentials được cấu hình
+        if (
+            config('cloudinary.cloud_name') &&
+            config('cloudinary.api_key') &&
+            config('cloudinary.api_secret')
+        ) {
+            $this->cloudinary = new Cloudinary([
+                'cloud_name' => config('cloudinary.cloud_name'),
+                'api_key' => config('cloudinary.api_key'),
+                'api_secret' => config('cloudinary.api_secret'),
+            ]);
+        }
+    }
+
     /**
      * Upload a file and create attachment record.
      */
@@ -68,18 +87,48 @@ class FileUploadService
             throw new Exception('File size exceeds limit of ' . $this->formatBytes($maxSize));
         }
 
-        // Generate unique filename
-        $filename = $this->generateFilename($file);
+        $cloudinaryPublicId = null;
+        $cloudinaryUrl = null;
+        $filePath = null;
 
-        // Store file
-        $path = $file->storeAs(
-            'attachments/' . date('Y/m'),
-            $filename,
-            'public'
-        );
+        // Try upload to Cloudinary first (if configured)
+        if ($this->cloudinary) {
+            try {
+                $isImage = $this->isImage($file);
+                $folder = config('cloudinary.folder', 'crm-helpdesk/attachments') . '/' . $ticketId;
 
-        if (!$path) {
-            throw new Exception('Failed to store file');
+                $uploadResult = $this->cloudinary->uploadApi()->upload(
+                    $file->getRealPath(),
+                    [
+                        'folder' => $folder,
+                        'public_id' => uniqid(),
+                        'resource_type' => $isImage ? 'image' : 'raw',
+                        'use_filename' => false,
+                    ]
+                );
+
+                $cloudinaryPublicId = $uploadResult['public_id'];
+                $cloudinaryUrl = $uploadResult['secure_url'] ?? null;
+                $filePath = $uploadResult['public_id'];
+
+            } catch (\Exception $e) {
+                // Log error but fallback to local storage
+                \Log::error('Cloudinary upload failed: ' . $e->getMessage() . '. Falling back to local storage.');
+            }
+        }
+
+        // Fallback to local storage if Cloudinary failed or not configured
+        if (!$cloudinaryUrl) {
+            $filename = $this->generateFilename($file);
+            $filePath = $file->storeAs(
+                'attachments/' . date('Y/m'),
+                $filename,
+                'public'
+            );
+
+            if (!$filePath) {
+                throw new Exception('Failed to store file');
+            }
         }
 
         // Create attachment record
@@ -88,16 +137,21 @@ class FileUploadService
             'user_id' => $userId,
             'message_id' => $messageId,
             'filename' => $file->getClientOriginalName(),
-            'file_path' => $path,
+            'file_path' => $filePath,
             'file_type' => $file->getMimeType(),
             'file_size' => $file->getSize(),
             'file_extension' => strtolower($file->getClientOriginalExtension()),
+            'cloudinary_public_id' => $cloudinaryPublicId,
+            'cloudinary_url' => $cloudinaryUrl,
         ]);
 
-        // Get full URL instead of relative URL
-        $url = Storage::url($path);
-        if (!str_starts_with($url, 'http')) {
-            $url = config('app.url') . $url;
+        // Get URL
+        $url = $cloudinaryUrl;
+        if (!$url) {
+            $url = Storage::url($filePath);
+            if (!str_starts_with($url, 'http')) {
+                $url = config('app.url') . $url;
+            }
         }
 
         return [
@@ -116,8 +170,19 @@ class FileUploadService
      */
     public function delete(Attachment $attachment): bool
     {
-        // Delete from storage
-        Storage::disk('public')->delete($attachment->file_path);
+        // Delete from Cloudinary if exists
+        if ($attachment->cloudinary_public_id && $this->cloudinary) {
+            try {
+                $this->cloudinary->uploadApi()->destroy($attachment->cloudinary_public_id);
+            } catch (\Exception $e) {
+                \Log::error('Failed to delete from Cloudinary: ' . $e->getMessage());
+            }
+        }
+
+        // Delete from local storage if exists (fallback)
+        if (!$attachment->cloudinary_public_id) {
+            Storage::disk('public')->delete($attachment->file_path);
+        }
 
         // Delete record
         return $attachment->delete();
@@ -149,6 +214,14 @@ class FileUploadService
         $category = $this->extensionMap[$extension] ?? 'document';
 
         return $this->maxSizes[$category] ?? $this->maxSizes['document'];
+    }
+
+    /**
+     * Check if file is an image.
+     */
+    private function isImage(UploadedFile $file): bool
+    {
+        return str_starts_with($file->getMimeType(), 'image/');
     }
 
     /**
