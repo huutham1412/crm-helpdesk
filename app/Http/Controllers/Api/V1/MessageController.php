@@ -4,8 +4,10 @@ namespace App\Http\Controllers\Api\V1;
 
 use App\Jobs\SendTelegramNotification;
 use App\Events\NewMessage;
+use App\Events\MessageRead;
 use App\Http\Controllers\Controller;
 use App\Models\Notification;
+use App\Models\Message;
 use App\Models\Ticket;
 use App\Repositories\MessageRepository;
 use App\Repositories\NotificationRepository;
@@ -139,9 +141,9 @@ class MessageController extends Controller
                 ]);
             }
 
-            // Broadcast realtime event for new message
+            // Broadcast realtime event for new message (to others only)
             try {
-                broadcast(new NewMessage($message, $ticket));
+                broadcast(new NewMessage($message, $ticket))->toOthers();
             } catch (\Exception $e) {
                 Log::error('Failed to broadcast NewMessage event: ' . $e->getMessage());
             }
@@ -188,6 +190,83 @@ class MessageController extends Controller
 
         return response()->json([
             'success' => true,
+        ]);
+    }
+
+    /**
+     * Mark messages as read for a ticket
+     */
+    public function markAsRead(Request $request, $ticketId): JsonResponse
+    {
+        $user = $request->user();
+        $ticket = Ticket::find($ticketId);
+
+        if (!$ticket) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Ticket not found',
+            ], 404);
+        }
+
+        // Authorization check
+        if (!$user->isCsKH() && $ticket->user_id !== $user->id) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Unauthorized',
+            ], 403);
+        }
+
+        // Get the message ID if specific message, otherwise mark all unread as read
+        $messageId = $request->input('message_id');
+
+        if ($messageId) {
+            // Mark specific message as read
+            $message = Message::where('ticket_id', $ticketId)
+                ->where('id', $messageId)
+                ->first();
+
+            if (!$message) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Message not found',
+                ], 404);
+            }
+
+            // Only mark as read if not the sender
+            if ($message->user_id !== $user->id) {
+                if (!$message->read_at) {
+                    $message->markAsRead();
+
+                    // Broadcast that message was read (with reader's user_id)
+                    try {
+                        broadcast(new MessageRead($message, $user->id));
+                    } catch (\Exception $e) {
+                        Log::error('Failed to broadcast MessageRead event: ' . $e->getMessage());
+                    }
+                }
+            }
+        } else {
+            // Mark all unread messages (not sent by current user) as read
+            $unreadMessages = Message::where('ticket_id', $ticketId)
+                ->where('user_id', '!=', $user->id)
+                ->whereNull('read_at')
+                ->get();
+
+            foreach ($unreadMessages as $msg) {
+                $msg->markAsRead();
+
+                // Broadcast each message read event (with reader's user_id)
+                try {
+                    broadcast(new MessageRead($msg, $user->id));
+                } catch (\Exception $e) {
+                    Log::error('Failed to broadcast MessageRead event: ' . $e->getMessage());
+                }
+            }
+        }
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Messages marked as read',
         ]);
     }
 }

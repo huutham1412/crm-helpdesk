@@ -14,11 +14,13 @@ class Message extends Model
         'message_type',
         'attachments',
         'is_internal',
+        'read_at',
     ];
 
     protected $casts = [
         'attachments' => 'array',
         'is_internal' => 'boolean',
+        'read_at' => 'datetime',
     ];
 
     public function ticket(): BelongsTo
@@ -69,5 +71,21 @@ class Message extends Model
     public function isVisibleToUser(): bool
     {
         return !$this->is_internal && !$this->isSystemMessage();
+    }
+
+    /**
+     * Mark message as read
+     */
+    public function markAsRead(): void
+    {
+        $this->update(['read_at' => now()]);
+    }
+
+    /**
+     * Check if message is read
+     */
+    public function isRead(): bool
+    {
+        return !is_null($this->read_at);
     }
 }

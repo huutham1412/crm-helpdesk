@@ -78,6 +78,9 @@ Route::prefix('v1')->group(function () {
         // ==================== TYPING INDICATOR ROUTE ====================
         Route::post('/tickets/{ticket}/typing', [MessageController::class, 'typing']);
 
+        // ==================== READ RECEIPT ROUTE ====================
+        Route::post('/tickets/{ticketId}/messages/read', [MessageController::class, 'markAsRead']);
+
         // ==================== BROADCASTING AUTH ROUTE ====================
         Route::post('/broadcasting/auth', [BroadcastController::class, 'authenticate']);
 
