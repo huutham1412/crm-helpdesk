@@ -59,7 +59,7 @@ class MessageRepository extends BaseRepository
      */
     public function paginateForTicket(int $ticketId, bool $includeInternal = false, int $perPage = 50): LengthAwarePaginator
     {
-        $query = $this->model->with('user')
+        $query = $this->model->with(['user', 'attachmentObjects'])
             ->where('ticket_id', $ticketId);
 
         if (!$includeInternal) {

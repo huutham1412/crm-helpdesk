@@ -79,6 +79,11 @@ class Ticket extends Model
         return $this->hasMany(Notification::class);
     }
 
+    public function attachments(): HasMany
+    {
+        return $this->hasMany(Attachment::class);
+    }
+
     // Scopes
     public function scopeForUser($query, $userId)
     {

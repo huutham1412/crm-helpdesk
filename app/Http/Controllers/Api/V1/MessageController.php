@@ -6,6 +6,7 @@ use App\Jobs\SendTelegramNotification;
 use App\Events\NewMessage;
 use App\Events\MessageRead;
 use App\Http\Controllers\Controller;
+use App\Models\Attachment;
 use App\Models\Notification;
 use App\Models\Message;
 use App\Models\Ticket;
@@ -66,7 +67,9 @@ class MessageController extends Controller
     public function store(Request $request, $ticketId): JsonResponse
     {
         $validator = Validator::make($request->all(), [
-            'message' => 'required|string',
+            'message' => 'nullable|string',
+            'attachment_ids' => 'nullable|array',
+            'attachment_ids.*' => 'exists:attachments,id',
             'attachments' => 'nullable|array',
             'is_internal' => 'boolean',
         ]);
@@ -76,6 +79,14 @@ class MessageController extends Controller
                 'success' => false,
                 'message' => 'Validation failed',
                 'errors' => $validator->errors(),
+            ], 422);
+        }
+
+        // Require either message text or attachments
+        if (empty($request->message) && empty($request->attachment_ids) && empty($request->attachments)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Either message text or attachments are required',
             ], 422);
         }
 
@@ -108,11 +119,20 @@ class MessageController extends Controller
 
         $message = $this->messageRepo->createForTicket($ticketId, [
             'user_id' => $user->id,
-            'message' => $request->message,
+            'message' => $request->message ?? '',
             'message_type' => 'text',
             'attachments' => $request->attachments,
             'is_internal' => $isInternal,
         ]);
+
+        // Link attachments to message
+        $attachmentIds = $request->input('attachment_ids', []);
+        if (!empty($attachmentIds)) {
+            Attachment::whereIn('id', $attachmentIds)
+                ->where('ticket_id', $ticketId)
+                ->whereNull('message_id')
+                ->update(['message_id' => $message->id]);
+        }
 
         // Update ticket status if it was closed
         if ($ticket->status === 'closed') {
@@ -129,14 +149,14 @@ class MessageController extends Controller
                 $this->notificationRepo->notifyUserAboutMessage(
                     $recipientId,
                     $ticketId,
-                    $request->message
+                    $request->message ?? 'Đã gửi file đính kèm'
                 );
             }
 
             // Gửi thông báo Telegram khi có tin nhắn mới từ user (chỉ notify khi user gửi, không spam khi CSKH trả lời)
             if ($user->id === $ticket->user_id) {
                 SendTelegramNotification::dispatch($ticket->load('user'), 'new_message', [
-                    'message' => $request->message,
+                    'message' => $request->message ?? 'Đã gửi file đính kèm',
                     'sender_name' => $user->name,
                 ]);
             }
@@ -153,7 +173,7 @@ class MessageController extends Controller
             'success' => true,
             'message' => 'Message sent successfully',
             'data' => [
-                'message' => $message->load('user'),
+                'message' => $message->load(['user', 'attachmentObjects']),
             ],
         ], 201);
     }

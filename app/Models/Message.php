@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Message extends Model
 {
@@ -23,6 +24,8 @@ class Message extends Model
         'read_at' => 'datetime',
     ];
 
+    protected $appends = ['attachments_data'];
+
     public function ticket(): BelongsTo
     {
         return $this->belongsTo(Ticket::class);
@@ -31,6 +34,11 @@ class Message extends Model
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
+    }
+
+    public function attachmentObjects(): HasMany
+    {
+        return $this->hasMany(Attachment::class);
     }
 
     // Scopes
@@ -87,5 +95,38 @@ class Message extends Model
     public function isRead(): bool
     {
         return !is_null($this->read_at);
+    }
+
+    /**
+     * Get attachments data with full URLs for API response
+     */
+    public function getAttachmentsDataAttribute(): array
+    {
+        if ($this->relationLoaded('attachmentObjects')) {
+            return $this->attachmentObjects->map(function ($attachment) {
+                return [
+                    'id' => $attachment->id,
+                    'filename' => $attachment->filename,
+                    'url' => $attachment->url,
+                    'size' => $attachment->getReadableSize(),
+                    'type' => $attachment->file_type,
+                    'extension' => $attachment->file_extension,
+                    'is_image' => $attachment->isImage(),
+                ];
+            })->toArray();
+        }
+
+        // Fallback: if relation not loaded, load it
+        return $this->attachmentObjects()->get()->map(function ($attachment) {
+            return [
+                'id' => $attachment->id,
+                'filename' => $attachment->filename,
+                'url' => $attachment->url,
+                'size' => $attachment->getReadableSize(),
+                'type' => $attachment->file_type,
+                'extension' => $attachment->file_extension,
+                'is_image' => $attachment->isImage(),
+            ];
+        })->toArray();
     }
 }

@@ -11,6 +11,7 @@ use App\Http\Controllers\Api\V1\NotificationController;
 use App\Http\Controllers\Api\V1\BroadcastController;
 use App\Http\Controllers\Api\V1\UserController;
 use App\Http\Controllers\Api\V1\RoleController;
+use App\Http\Controllers\Api\V1\AttachmentController;
 
 /*
 |--------------------------------------------------------------------------
@@ -74,6 +75,12 @@ Route::prefix('v1')->group(function () {
         Route::middleware('role:CSKH|Admin')->group(function () {
             Route::get('/users/cskh-list', [UserController::class, 'cskhList']);
         });
+
+        // ==================== ATTACHMENT ROUTES ====================
+        Route::get('/tickets/{ticketId}/attachments', [AttachmentController::class, 'index']);
+        Route::post('/tickets/{ticketId}/attachments', [AttachmentController::class, 'upload']);
+        Route::get('/attachments/{id}', [AttachmentController::class, 'show']);
+        Route::delete('/attachments/{id}', [AttachmentController::class, 'destroy']);
 
         // ==================== TYPING INDICATOR ROUTE ====================
         Route::post('/tickets/{ticket}/typing', [MessageController::class, 'typing']);
