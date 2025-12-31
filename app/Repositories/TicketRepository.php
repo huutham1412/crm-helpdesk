@@ -263,4 +263,261 @@ class TicketRepository extends BaseRepository
             ->select(\DB::raw('AVG(TIMESTAMPDIFF(MINUTE, created_at, resolved_at)) as avg_time'))
             ->value('avg_time') ?? 0;
     }
+
+    /**
+     * Get performance metrics for dashboard
+     */
+    public function getPerformanceMetrics(int $days = 30): array
+    {
+        $period = now()->subDays($days);
+
+        // Tickets created per day (average)
+        $avgTicketsPerDay = $this->model->where('created_at', '>=', $period)
+            ->select(\DB::raw('COUNT(*) / ' . $days . ' as avg'))
+            ->value('avg') ?? 0;
+
+        // Resolution rate (resolved / total)
+        $totalTickets = $this->model->where('created_at', '>=', $period)->count();
+        $resolvedTickets = $this->model->where('created_at', '>=', $period)
+            ->where('status', 'resolved')->count();
+        $resolutionRate = $totalTickets > 0 ? ($resolvedTickets / $totalTickets) * 100 : 0;
+
+        // Average first response time (minutes) - time to first message
+        $avgFirstResponseTime = \DB::table('messages')
+            ->join('tickets', 'messages.ticket_id', '=', 'tickets.id')
+            ->where('messages.message_type', '!=', 'system')
+            ->where('tickets.created_at', '>=', $period)
+            ->where('messages.user_id', '!=', \DB::raw('tickets.user_id')) // CSKH response
+            ->select(\DB::raw('AVG(TIMESTAMPDIFF(MINUTE, tickets.created_at, messages.created_at)) as avg_time'))
+            ->value('avg_time') ?? 0;
+
+        // Tickets overdue (> 24 hours without resolution for urgent/high)
+        $overdueTickets = $this->model->where('status', '!=', 'closed')
+            ->where('status', '!=', 'resolved')
+            ->whereIn('priority', ['urgent', 'high'])
+            ->where('created_at', '<', now()->subHours(24))
+            ->count();
+
+        return [
+            'avg_tickets_per_day' => round($avgTicketsPerDay, 1),
+            'resolution_rate' => round($resolutionRate, 1),
+            'avg_first_response_time' => round($avgFirstResponseTime, 0),
+            'overdue_tickets' => $overdueTickets,
+        ];
+    }
+
+    /**
+     * Get CSKH performance stats
+     */
+    public function getCSKHPerformance(int $days = 30): Collection
+    {
+        $period = now()->subDays($days);
+
+        return \DB::table('tickets as t')
+            ->join('users as u', 't.assigned_to', '=', 'u.id')
+            ->where('t.assigned_to', '!=', null)
+            ->where('t.created_at', '>=', $period)
+            ->select(
+                'u.id',
+                'u.name',
+                \DB::raw('COUNT(*) as total_assigned'),
+                \DB::raw('SUM(CASE WHEN t.status = "resolved" THEN 1 ELSE 0 END) as total_resolved'),
+                \DB::raw('SUM(CASE WHEN t.status = "closed" THEN 1 ELSE 0 END) as total_closed'),
+                \DB::raw('AVG(CASE WHEN t.resolved_at IS NOT NULL THEN TIMESTAMPDIFF(MINUTE, t.created_at, t.resolved_at) ELSE NULL END) as avg_resolution_time')
+            )
+            ->groupBy('u.id', 'u.name')
+            ->orderByDesc('total_resolved')
+            ->get()
+            ->map(function ($item) {
+                return [
+                    'id' => $item->id,
+                    'name' => $item->name,
+                    'total_assigned' => $item->total_assigned,
+                    'total_resolved' => $item->total_resolved,
+                    'total_closed' => $item->total_closed ?? 0,
+                    'avg_resolution_time' => round($item->avg_resolution_time ?? 0, 0),
+                    'completion_rate' => $item->total_assigned > 0
+                        ? round((($item->total_resolved + ($item->total_closed ?? 0)) / $item->total_assigned) * 100, 1)
+                        : 0,
+                ];
+            });
+    }
+
+    /**
+     * Get monthly trend comparison (current vs previous month)
+     */
+    public function getMonthlyTrendComparison(): array
+    {
+        $currentMonth = now()->month;
+        $previousMonth = now()->subMonth()->month;
+        $currentYear = now()->year;
+        $previousYear = now()->subMonth()->year;
+
+        $currentMonthCount = $this->model
+            ->whereYear('created_at', $currentYear)
+            ->whereMonth('created_at', $currentMonth)
+            ->count();
+
+        $previousMonthCount = $this->model
+            ->whereYear('created_at', $previousYear)
+            ->whereMonth('created_at', $previousMonth)
+            ->count();
+
+        $change = $previousMonthCount > 0
+            ? (($currentMonthCount - $previousMonthCount) / $previousMonthCount) * 100
+            : 0;
+
+        return [
+            'current_month' => [
+                'count' => $currentMonthCount,
+                'label' => now()->format('F Y'),
+            ],
+            'previous_month' => [
+                'count' => $previousMonthCount,
+                'label' => now()->subMonth()->format('F Y'),
+            ],
+            'change_percent' => round($change, 1),
+            'trend' => $change >= 0 ? 'up' : 'down',
+        ];
+    }
+
+    /**
+     * Get tickets by hour (for heat map)
+     */
+    public function getTicketsByHour(int $days = 30): array
+    {
+        $data = $this->model->select(\DB::raw('HOUR(created_at) as hour'), \DB::raw('count(*) as count'))
+            ->where('created_at', '>=', now()->subDays($days))
+            ->groupBy('hour')
+            ->pluck('count', 'hour')
+            ->toArray();
+
+        // Fill missing hours with 0
+        $result = [];
+        for ($i = 0; $i < 24; $i++) {
+            $result[$i] = $data[$i] ?? 0;
+        }
+
+        return $result;
+    }
+
+    /**
+     * Get tickets by day of week
+     */
+    public function getTicketsByDayOfWeek(int $weeks = 4): array
+    {
+        $data = $this->model->select(\DB::raw('DAYOFWEEK(created_at) as day'), \DB::raw('count(*) as count'))
+            ->where('created_at', '>=', now()->subWeeks($weeks))
+            ->groupBy('day')
+            ->pluck('count', 'day')
+            ->toArray();
+
+        $dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+        $result = [];
+        for ($i = 0; $i <= 7; $i++) {
+            $result[] = [
+                'day' => $dayNames[$i] ?? '',
+                'count' => $data[$i] ?? 0,
+            ];
+        }
+
+        return $result;
+    }
+
+    /**
+     * Get SLA compliance stats
+     */
+    public function getSLAStats(int $days = 30): array
+    {
+        $period = now()->subDays($days);
+
+        // Urgent tickets should be resolved within 4 hours
+        $urgentTotal = $this->model->where('priority', 'urgent')
+            ->where('created_at', '>=', $period)
+            ->count();
+
+        $urgentResolved = $this->model->where('priority', 'urgent')
+            ->where('created_at', '>=', $period)
+            ->whereNotNull('resolved_at')
+            ->whereRaw('TIMESTAMPDIFF(MINUTE, created_at, resolved_at) <= 240') // 4 hours
+            ->count();
+
+        // High tickets should be resolved within 24 hours
+        $highTotal = $this->model->where('priority', 'high')
+            ->where('created_at', '>=', $period)
+            ->count();
+
+        $highResolved = $this->model->where('priority', 'high')
+            ->where('created_at', '>=', $period)
+            ->whereNotNull('resolved_at')
+            ->whereRaw('TIMESTAMPDIFF(MINUTE, created_at, resolved_at) <= 1440') // 24 hours
+            ->count();
+
+        return [
+            'urgent' => [
+                'total' => $urgentTotal,
+                'within_sla' => $urgentResolved,
+                'sla_rate' => $urgentTotal > 0 ? round(($urgentResolved / $urgentTotal) * 100, 1) : 0,
+            ],
+            'high' => [
+                'total' => $highTotal,
+                'within_sla' => $highResolved,
+                'sla_rate' => $highTotal > 0 ? round(($highResolved / $highTotal) * 100, 1) : 0,
+            ],
+        ];
+    }
+
+    /**
+     * Get ticket status changes over time
+     */
+    public function getStatusFlow(int $days = 30): Collection
+    {
+        return $this->model->select(
+            \DB::raw('DATE(created_at) as date'),
+            'status',
+            \DB::raw('count(*) as count')
+        )
+            ->where('created_at', '>=', now()->subDays($days))
+            ->groupBy('date', 'status')
+            ->orderBy('date')
+            ->orderBy('status')
+            ->get()
+            ->groupBy('date');
+    }
+
+    /**
+     * Get top categories by ticket count
+     */
+    public function getTopCategories(int $limit = 5, int $days = 30): Collection
+    {
+        return \DB::table('tickets as t')
+            ->join('categories as c', 't.category_id', '=', 'c.id')
+            ->where('t.created_at', '>=', now()->subDays($days))
+            ->select('c.name', \DB::raw('COUNT(*) as count'))
+            ->groupBy('c.id', 'c.name')
+            ->orderByDesc('count')
+            ->limit($limit)
+            ->get();
+    }
+
+    /**
+     * Get unassigned tickets count by priority
+     */
+    public function getUnassignedByPriority(): array
+    {
+        $data = $this->model->whereNull('assigned_to')
+            ->where('status', '!=', 'closed')
+            ->select('priority', \DB::raw('count(*) as count'))
+            ->groupBy('priority')
+            ->pluck('count', 'priority')
+            ->toArray();
+
+        return [
+            'urgent' => $data['urgent'] ?? 0,
+            'high' => $data['high'] ?? 0,
+            'medium' => $data['medium'] ?? 0,
+            'low' => $data['low'] ?? 0,
+            'total' => array_sum($data),
+        ];
+    }
 }

@@ -31,6 +31,7 @@ class DashboardController extends Controller
     public function statistics(Request $request): JsonResponse
     {
         $user = $request->user();
+        $days = $request->get('days', 30);
 
         // Basic stats
         $ticketStats = $this->ticketRepo->getStatistics($user);
@@ -64,6 +65,9 @@ class DashboardController extends Controller
             $userStats = $this->userRepo->getStatistics();
             $stats['total_users'] = $userStats['total'];
             $stats['cskh_users'] = $userStats['cskh'];
+
+            // Unassigned tickets by priority
+            $stats['unassigned_by_priority'] = $this->ticketRepo->getUnassignedByPriority();
         }
 
         // Recent tickets for current user
@@ -72,6 +76,72 @@ class DashboardController extends Controller
         return response()->json([
             'success' => true,
             'data' => $stats,
+        ]);
+    }
+
+    /**
+     * Get advanced analytics (CSKH/Admin only)
+     */
+    public function analytics(Request $request): JsonResponse
+    {
+        if (!$request->user()->isCsKH()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Unauthorized',
+            ], 403);
+        }
+
+        $days = $request->get('days', 30);
+
+        return response()->json([
+            'success' => true,
+            'data' => [
+                // Performance metrics
+                'performance' => $this->ticketRepo->getPerformanceMetrics($days),
+
+                // CSKH performance ranking
+                'cskh_performance' => $this->ticketRepo->getCSKHPerformance($days),
+
+                // Monthly trend comparison
+                'monthly_comparison' => $this->ticketRepo->getMonthlyTrendComparison(),
+
+                // SLA compliance
+                'sla_stats' => $this->ticketRepo->getSLAStats($days),
+
+                // Top categories
+                'top_categories' => $this->ticketRepo->getTopCategories(5, $days),
+            ],
+        ]);
+    }
+
+    /**
+     * Get chart data for dashboard
+     */
+    public function charts(Request $request): JsonResponse
+    {
+        if (!$request->user()->isCsKH()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Unauthorized',
+            ], 403);
+        }
+
+        $days = $request->get('days', 30);
+        $type = $request->get('type', 'trend');
+
+        $data = match ($type) {
+            'trend' => $this->ticketRepo->getTrend($days),
+            'hourly' => $this->ticketRepo->getTicketsByHour($days),
+            'daily' => $this->ticketRepo->getTicketsByDayOfWeek(ceil($days / 7)),
+            'status' => $this->ticketRepo->getByStatusStats(),
+            'priority' => $this->ticketRepo->getByPriorityStats(),
+            'category' => $this->ticketRepo->getByCategoryStats(),
+            default => $this->ticketRepo->getTrend($days),
+        };
+
+        return response()->json([
+            'success' => true,
+            'data' => $data,
         ]);
     }
 

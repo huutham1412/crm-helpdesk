@@ -62,6 +62,8 @@ Route::prefix('v1')->group(function () {
         // CSKH/Admin only dashboard routes
         Route::middleware('role:CSKH|Admin')->group(function () {
             Route::get('/dashboard/activity', [DashboardController::class, 'recentActivity']);
+            Route::get('/dashboard/analytics', [DashboardController::class, 'analytics']);
+            Route::get('/dashboard/charts', [DashboardController::class, 'charts']);
         });
 
         // Notification routes

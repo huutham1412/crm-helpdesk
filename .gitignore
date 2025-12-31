@@ -6,6 +6,8 @@
 .phpactor.json
 .phpunit.result.cache
 TELEGRAM_SETUP.md
+questions.md
+about.md
 /.fleet
 /.idea
 /.nova
