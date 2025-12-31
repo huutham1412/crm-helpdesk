@@ -84,6 +84,11 @@ class Ticket extends Model
         return $this->hasMany(Attachment::class);
     }
 
+    public function rating()
+    {
+        return $this->hasOne(Rating::class);
+    }
+
     // Scopes
     public function scopeForUser($query, $userId)
     {
@@ -163,5 +168,13 @@ class Ticket extends Model
             'status' => 'closed',
             'closed_at' => now(),
         ]);
+    }
+
+    /**
+     * Check if ticket has been rated
+     */
+    public function hasBeenRated(): bool
+    {
+        return $this->rating()->exists();
     }
 }

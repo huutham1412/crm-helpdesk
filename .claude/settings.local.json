@@ -9,7 +9,8 @@
       "Bash(\"D:/apps/laragon/laragon/bin/php/php-8.2.30-nts-Win32-vs16-x64/php.exe\" artisan migrate:force --path=database/migrations/2025_12_30_005029_add_read_at_to_messages_table.php)",
       "Bash(\"D:/apps/laragon/laragon/bin/php/php-8.2.30-nts-Win32-vs16-x64/php.exe\" artisan make:event MessageRead)",
       "Bash(dir:*)",
-      "Bash(\"D:/apps/laragon/laragon/bin/php/php-8.2.30-nts-Win32-vs16-x64/php.exe\" artisan:*)"
+      "Bash(\"D:/apps/laragon/laragon/bin/php/php-8.2.30-nts-Win32-vs16-x64/php.exe\" artisan:*)",
+      "Bash(findstr:*)"
     ]
   }
 }

@@ -12,6 +12,7 @@ use App\Models\Message;
 use App\Models\Ticket;
 use App\Repositories\MessageRepository;
 use App\Repositories\NotificationRepository;
+use App\Repositories\TicketRepository;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Validator;
@@ -134,6 +135,25 @@ class MessageController extends Controller
                 ->update(['message_id' => $message->id]);
         }
 
+        // Auto-assign ticket to CSKH if unassigned (CSKH/Admin first response)
+        $wasAutoAssigned = false;
+        if ($user->isCsKH() && !$ticket->assigned_to && !$isInternal) {
+            $ticketRepo = new TicketRepository(new Ticket());
+            $ticketRepo->assignTo($ticketId, $user->id);
+
+            // Create system message for auto-assign
+            $this->messageRepo->createForTicket($ticketId, [
+                'user_id' => null,
+                'message' => "Ticket tự động gán cho {$user->name}",
+                'message_type' => 'system',
+                'is_internal' => false,
+            ]);
+
+            // Reload ticket to get assigned user
+            $ticket->refresh();
+            $wasAutoAssigned = true;
+        }
+
         // Update ticket status if it was closed
         if ($ticket->status === 'closed') {
             $ticket->update(['status' => 'open']);
@@ -174,6 +194,7 @@ class MessageController extends Controller
             'message' => 'Message sent successfully',
             'data' => [
                 'message' => $message->load(['user', 'attachmentObjects']),
+                'ticket' => $ticket->load('assignedTo'),
             ],
         ], 201);
     }

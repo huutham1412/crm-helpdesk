@@ -221,14 +221,14 @@ class TicketRepository extends BaseRepository
     }
 
     /**
-     * Assign ticket to user
+     * Assign ticket to user (or unassign if userId is null)
      */
-    public function assignTo(int $ticketId, int $userId): Ticket
+    public function assignTo(int $ticketId, ?int $userId): Ticket
     {
         $ticket = $this->findOrFail($ticketId);
         $ticket->update([
             'assigned_to' => $userId,
-            'status' => 'processing',
+            'status' => $userId ? 'processing' : $ticket->status,
         ]);
         return $ticket->fresh();
     }

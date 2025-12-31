@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
+use Illuminate\Database\Eloquent\Concerns\HasEvents;
 use Illuminate\Notifications\Notifiable;
 use Laravel\Sanctum\HasApiTokens;
 use Spatie\Permission\Traits\HasRoles;
@@ -27,6 +28,9 @@ class User extends Authenticatable
         'password',
         'phone',
         'avatar',
+        'avg_rating',
+        'total_ratings',
+        'rating_distribution',
     ];
 
     /**
@@ -71,6 +75,16 @@ class User extends Authenticatable
     public function notifications(): HasMany
     {
         return $this->hasMany(Notification::class);
+    }
+
+    public function receivedRatings(): HasMany
+    {
+        return $this->hasMany(Rating::class, 'rated_user_id');
+    }
+
+    public function givenRatings(): HasMany
+    {
+        return $this->hasMany(Rating::class, 'user_id');
     }
 
     // Helper methods for role checking
@@ -128,5 +142,38 @@ class User extends Authenticatable
     public function getFullNameAttribute(): string
     {
         return $this->name ?? $this->email ?? 'Unknown';
+    }
+
+    /**
+     * Update rating statistics for this user
+     * Should be called after a new rating is received
+     */
+    public function updateRatingStats(): void
+    {
+        $ratings = $this->receivedRatings;
+
+        $this->avg_rating = $ratings->avg('rating');
+        $this->total_ratings = $ratings->count();
+
+        // Calculate distribution: {1: x, 2: y, 3: z, 4: w, 5: v}
+        $distribution = [
+            '1' => 0, '2' => 0, '3' => 0, '4' => 0, '5' => 0
+        ];
+
+        foreach ($ratings as $rating) {
+            $starValue = (int) round($rating->rating);
+            if ($starValue >= 1 && $starValue <= 5) {
+                $distribution[(string) $starValue]++;
+            }
+        }
+
+        $this->rating_distribution = $distribution;
+
+        // Use DB update to avoid triggering model events
+        $this->newQuery()->where('id', $this->id)->update([
+            'avg_rating' => $this->avg_rating,
+            'total_ratings' => $this->total_ratings,
+            'rating_distribution' => $this->rating_distribution,
+        ]);
     }
 }

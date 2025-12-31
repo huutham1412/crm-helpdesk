@@ -225,7 +225,7 @@ class TicketController extends Controller
     public function assign(Request $request, $id): JsonResponse
     {
         $validator = Validator::make($request->all(), [
-            'user_id' => 'required|exists:users,id',
+            'user_id' => 'nullable|exists:users,id',
         ]);
 
         if ($validator->fails()) {
@@ -236,31 +236,42 @@ class TicketController extends Controller
             ], 422);
         }
 
-        $ticket = $this->ticketRepo->assignTo($id, $request->user_id);
+        $userId = $request->user_id;
+        $ticket = $this->ticketRepo->assignTo($id, $userId);
 
         // Create system message
-        Message::create([
-            'ticket_id' => $ticket->id,
-            'user_id' => $request->user()->id,
-            'message' => "Ticket assigned to " . $ticket->assignedTo->name,
-            'message_type' => 'system',
-        ]);
+        if ($userId) {
+            Message::create([
+                'ticket_id' => $ticket->id,
+                'user_id' => $request->user()->id,
+                'message' => "Ticket assigned to " . $ticket->assignedTo->name,
+                'message_type' => 'system',
+            ]);
 
-        // Notify assigned CSKH
-        if ($ticket->assigned_to !== $request->user()->id) {
-            $this->notificationRepo->notifyCsKHAboutAssignment(
-                $ticket->assigned_to,
-                $ticket->id,
-                $ticket->ticket_number
-            );
+            // Notify assigned CSKH
+            if ($ticket->assigned_to !== $request->user()->id) {
+                $this->notificationRepo->notifyCsKHAboutAssignment(
+                    $ticket->assigned_to,
+                    $ticket->id,
+                    $ticket->ticket_number
+                );
+            }
+
+            // Gửi thông báo Telegram khi ticket được assign
+            SendTelegramNotification::dispatch($ticket, 'ticket_assigned');
+        } else {
+            // Unassign
+            Message::create([
+                'ticket_id' => $ticket->id,
+                'user_id' => $request->user()->id,
+                'message' => "Ticket unassigned",
+                'message_type' => 'system',
+            ]);
         }
-
-        // Gửi thông báo Telegram khi ticket được assign
-        SendTelegramNotification::dispatch($ticket, 'ticket_assigned');
 
         return response()->json([
             'success' => true,
-            'message' => 'Ticket assigned successfully',
+            'message' => $userId ? 'Ticket assigned successfully' : 'Ticket unassigned successfully',
             'data' => [
                 'ticket' => $ticket->load('assignedTo'),
             ],

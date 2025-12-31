@@ -12,6 +12,7 @@ use App\Http\Controllers\Api\V1\BroadcastController;
 use App\Http\Controllers\Api\V1\UserController;
 use App\Http\Controllers\Api\V1\RoleController;
 use App\Http\Controllers\Api\V1\AttachmentController;
+use App\Http\Controllers\Api\V1\RatingController;
 
 /*
 |--------------------------------------------------------------------------
@@ -92,6 +93,16 @@ Route::prefix('v1')->group(function () {
 
         // ==================== BROADCASTING AUTH ROUTE ====================
         Route::post('/broadcasting/auth', [BroadcastController::class, 'authenticate']);
+
+        // ==================== RATING ROUTES ====================
+        Route::get('/tickets/{ticketId}/rating', [RatingController::class, 'show']);
+        Route::post('/tickets/{ticketId}/rating', [RatingController::class, 'store']);
+
+        // Rating stats (CSKH/Admin only)
+        Route::middleware('role:CSKH|Admin')->group(function () {
+            Route::get('/ratings/cskh-stats', [RatingController::class, 'cskhStats']);
+            Route::get('/ratings/my-stats', [RatingController::class, 'myStats']);
+        });
 
         // ==================== ADMIN ONLY ROUTES ====================
         Route::middleware('role:Admin')->group(function () {
