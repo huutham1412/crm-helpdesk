@@ -13,6 +13,7 @@ use App\Http\Controllers\Api\V1\UserController;
 use App\Http\Controllers\Api\V1\RoleController;
 use App\Http\Controllers\Api\V1\AttachmentController;
 use App\Http\Controllers\Api\V1\RatingController;
+use App\Http\Controllers\Api\V1\CannedResponseController;
 
 /*
 |--------------------------------------------------------------------------
@@ -102,6 +103,20 @@ Route::prefix('v1')->group(function () {
         Route::middleware('role:CSKH|Admin')->group(function () {
             Route::get('/ratings/cskh-stats', [RatingController::class, 'cskhStats']);
             Route::get('/ratings/my-stats', [RatingController::class, 'myStats']);
+        });
+
+        // ==================== CANNED RESPONSE ROUTES ====================
+        // CSKH/Admin only
+        Route::middleware('role:CSKH|Admin')->group(function () {
+            Route::get('/canned-responses', [CannedResponseController::class, 'index']);
+            Route::get('/canned-responses/all', [CannedResponseController::class, 'getAllActive']);
+            Route::get('/canned-responses/popular', [CannedResponseController::class, 'popular']);
+            Route::get('/canned-responses/{id}', [CannedResponseController::class, 'show']);
+            Route::post('/canned-responses', [CannedResponseController::class, 'store']);
+            Route::put('/canned-responses/{id}', [CannedResponseController::class, 'update']);
+            Route::delete('/canned-responses/{id}', [CannedResponseController::class, 'destroy']);
+            Route::post('/canned-responses/{id}/preview', [CannedResponseController::class, 'preview']);
+            Route::post('/canned-responses/{id}/use', [CannedResponseController::class, 'incrementUsage']);
         });
 
         // ==================== ADMIN ONLY ROUTES ====================
