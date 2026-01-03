@@ -173,6 +173,13 @@ class TicketController extends Controller
         // Handle status-specific logic
         if ($request->has('status')) {
             $ticket = $this->ticketRepo->updateStatus($id, $request->status);
+
+            // Track status change time for SLA (when changing from open to processing)
+            if ($oldStatus === 'open' && $request->status === 'processing') {
+                $ticket->updateLastStatusChange();
+                // Resolve escalations when status changes
+                $ticket->resolveEscalations();
+            }
         }
 
         // Update other fields

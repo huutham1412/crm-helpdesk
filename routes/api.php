@@ -14,6 +14,7 @@ use App\Http\Controllers\Api\V1\RoleController;
 use App\Http\Controllers\Api\V1\AttachmentController;
 use App\Http\Controllers\Api\V1\RatingController;
 use App\Http\Controllers\Api\V1\CannedResponseController;
+use App\Http\Controllers\Api\V1\EscalationController;
 
 /*
 |--------------------------------------------------------------------------
@@ -117,6 +118,14 @@ Route::prefix('v1')->group(function () {
             Route::delete('/canned-responses/{id}', [CannedResponseController::class, 'destroy']);
             Route::post('/canned-responses/{id}/preview', [CannedResponseController::class, 'preview']);
             Route::post('/canned-responses/{id}/use', [CannedResponseController::class, 'incrementUsage']);
+        });
+
+        // ==================== ESCALATION ROUTES ====================
+        // Admin only - View escalation history and statistics
+        Route::middleware('role:Admin')->group(function () {
+            Route::get('/escalations', [EscalationController::class, 'index']);
+            Route::get('/escalations/statistics', [EscalationController::class, 'statistics']);
+            Route::get('/escalations/{id}', [EscalationController::class, 'show']);
         });
 
         // ==================== ADMIN ONLY ROUTES ====================

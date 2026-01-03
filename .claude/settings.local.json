@@ -10,7 +10,11 @@
       "Bash(\"D:/apps/laragon/laragon/bin/php/php-8.2.30-nts-Win32-vs16-x64/php.exe\" artisan make:event MessageRead)",
       "Bash(dir:*)",
       "Bash(\"D:/apps/laragon/laragon/bin/php/php-8.2.30-nts-Win32-vs16-x64/php.exe\" artisan:*)",
-      "Bash(findstr:*)"
+      "Bash(findstr:*)",
+      "Bash(\"D:/apps/laragon/laragon/bin/php/php-8.2.30-nts-Win32-vs16-x64/php.exe\" \"D:/apps/laragon/laragon/www/crm-helpdesk/artisan\" queue:work --once --timeout=60)",
+      "Bash(\"D:/apps/laragon/laragon/bin/php/php-8.2.30-nts-Win32-vs16-x64/php.exe\" \"D:/apps/laragon/laragon/www/crm-helpdesk/artisan\" tinker --execute=\"$t = App\\\\Models\\\\Ticket::first\\(\\); echo ''Ticket: '' . $t->ticket_number . PHP_EOL; echo ''Priority: '' . $t->priority . PHP_EOL; echo ''Status: '' . $t->status . PHP_EOL; echo ''Created: '' . $t->created_at . PHP_EOL; echo ''Last Status Change: '' . \\($t->last_status_change_at ?? ''null''\\) . PHP_EOL; echo ''Response Time \\(minutes\\): '' . $t->getResponseTimeMinutes\\(\\) . PHP_EOL; echo ''Minutes Since Start: '' . $t->getMinutesSinceResponseStart\\(\\) . PHP_EOL; echo ''Should Escalate Warning: '' . \\($t->shouldEscalateWarning\\(\\) ? ''YES'' : ''NO''\\) . PHP_EOL; echo ''Escalations count: '' . $t->escalations\\(\\)->count\\(\\) . PHP_EOL;\")",
+      "Bash(\"D:/apps/laragon/laragon/bin/php/php-8.2.30-nts-Win32-vs16-x64/php.exe\" \"D:/apps/laragon/laragon/www/crm-helpdesk/artisan\" tinker --execute=\"echo ''Ticket: '' . App\\\\Models\\\\Ticket::first\\(\\)->ticket_number . PHP_EOL; echo ''Priority: '' . App\\\\Models\\\\Ticket::first\\(\\)->priority . PHP_EOL; echo ''Status: '' . App\\\\Models\\\\Ticket::first\\(\\)->status . PHP_EOL; echo ''Created: '' . App\\\\Models\\\\Ticket::first\\(\\)->created_at . PHP_EOL; echo ''Minutes Since: '' . App\\\\Models\\\\Ticket::first\\(\\)->getMinutesSinceResponseStart\\(\\) . PHP_EOL; echo ''Should Warning: '' . \\(App\\\\Models\\\\Ticket::first\\(\\)->shouldEscalateWarning\\(\\) ? ''YES'' : ''NO''\\) . PHP_EOL;\")",
+      "Bash(\"D:/apps/laragon/laragon/bin/php/php-8.2.30-nts-Win32-vs16-x64/php.exe\" \"D:/apps/laragon/laragon/www/crm-helpdesk/artisan\" tinker --execute=\"App\\\\Models\\\\Ticket::first\\(\\)->shouldEscalateWarning\\(\\) ? print\\(''YES''\\) : print\\(''NO''\\)\")"
     ]
   }
 }

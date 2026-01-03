@@ -31,7 +31,7 @@ class SendTelegramNotification implements ShouldQueue
     protected Ticket $ticket;
 
     /**
-     * Loại notification: new_ticket, status_changed, ticket_assigned, new_message
+     * Loại notification: new_ticket, status_changed, ticket_assigned, new_message, sla_warning, sla_escalated
      */
     protected string $type;
 
@@ -114,6 +114,10 @@ class SendTelegramNotification implements ShouldQueue
                 return $this->buildNewMessageMessage($ticket);
             case 'urgent_ticket':
                 return $this->buildUrgentTicketMessage($ticket);
+            case 'sla_warning':
+                return $this->buildSlaWarningMessage($ticket);
+            case 'sla_escalated':
+                return $this->buildSlaEscalatedMessage($ticket);
             default:
                 return $this->buildDefaultMessage($ticket);
         }
@@ -224,6 +228,60 @@ Trạng thái đã thay đổi:
 
 🔗 [Xem ngay]({$ticketUrl})
 ⏰ " . $ticket->created_at->format('H:i d/m/Y');
+    }
+
+    /**
+     * Message cho SLA Warning (cảnh báo quá hạn phản hồi)
+     */
+    protected function buildSlaWarningMessage(Ticket $ticket): string
+    {
+        $priorityEmoji = $this->getPriorityEmoji($ticket->priority);
+        $priorityLabel = $this->getPriorityLabel($ticket->priority);
+        $responseTime = $this->data['response_time'] ?? $ticket->getResponseTimeMinutes();
+        $minutesElapsed = $this->data['minutes_elapsed'] ?? $ticket->getMinutesSinceResponseStart();
+        $frontendUrl = env('FRONTEND_URL', 'http://localhost:5173');
+        $ticketUrl = $frontendUrl . '/tickets/' . $ticket->id;
+
+        return "⚠️ *SLA WARNING* {$priorityEmoji}
+
+*Ticket:* `{$ticket->ticket_number}`
+*Tiêu đề:* {$ticket->subject}
+*Độ ưu tiên:* {$priorityLabel}
+*Người tạo:* {$ticket->user->name}
+
+Ticket chưa được phản hồi sau *{$responseTime} phút*!
+🕰 Đã trôi: {$minutesElapsed} phút
+
+🔗 [Xem ticket]({$ticketUrl})
+⏰ " . now()->format('H:i d/m/Y');
+    }
+
+    /**
+     * Message cho SLA Escalated (đã escalate lên Admin)
+     */
+    protected function buildSlaEscalatedMessage(Ticket $ticket): string
+    {
+        $priorityEmoji = $this->getPriorityEmoji($ticket->priority);
+        $priorityLabel = $this->getPriorityLabel($ticket->priority);
+        $escalationThreshold = $this->data['escalation_threshold'] ?? $ticket->getEscalationThresholdMinutes();
+        $minutesElapsed = $this->data['minutes_elapsed'] ?? $ticket->getMinutesSinceResponseStart();
+        $assignedTo = $ticket->assignedTo ? $ticket->assignedTo->name : 'Chưa gán';
+        $frontendUrl = env('FRONTEND_URL', 'http://localhost:5173');
+        $ticketUrl = $frontendUrl . '/tickets/' . $ticket->id;
+
+        return "🔴 *SLA ESCALATED* {$priorityEmoji}
+
+*Ticket:* `{$ticket->ticket_number}`
+*Tiêu đề:* {$ticket->subject}
+*Độ ưu tiên:* {$priorityLabel}
+*Người tạo:* {$ticket->user->name}
+*Người xử lý:* {$assignedTo}
+
+Ticket đã quá hạn *{$escalationThreshold} phút* và cần ADMIN xử lý!
+🕰 Đã trôi: {$minutesElapsed} phút
+
+🔗 [Xem ngay]({$ticketUrl})
+⏰ " . now()->format('H:i d/m/Y');
     }
 
     /**
