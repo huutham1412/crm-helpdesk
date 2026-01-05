@@ -10,3 +10,6 @@ Artisan::command('inspire', function () {
 
 // SLA Escalation Check - Run every minute
 Schedule::command('sla:check')->everyMinute()->description('Check SLA escalation for tickets');
+
+// Clean old activity logs - Run weekly
+Schedule::command('activity-logs:clean')->weekly()->description('Clean old activity logs');

@@ -15,6 +15,7 @@ use App\Http\Controllers\Api\V1\AttachmentController;
 use App\Http\Controllers\Api\V1\RatingController;
 use App\Http\Controllers\Api\V1\CannedResponseController;
 use App\Http\Controllers\Api\V1\EscalationController;
+use App\Http\Controllers\Api\V1\ActivityLogController;
 
 /*
 |--------------------------------------------------------------------------
@@ -144,6 +145,15 @@ Route::prefix('v1')->group(function () {
             Route::post('/categories', [CategoryController::class, 'store']);
             Route::put('/categories/{id}', [CategoryController::class, 'update']);
             Route::delete('/categories/{id}', [CategoryController::class, 'destroy']);
+
+            // Activity Log routes
+            Route::get('/activity-logs', [ActivityLogController::class, 'index']);
+            Route::get('/activity-logs/options', [ActivityLogController::class, 'options']);
+            Route::get('/activity-logs/statistics', [ActivityLogController::class, 'statistics']);
+            Route::get('/activity-logs/subject/history', [ActivityLogController::class, 'subjectHistory']);
+            Route::get('/activity-logs/{id}', [ActivityLogController::class, 'show']);
+            Route::get('/activity-logs/export', [ActivityLogController::class, 'export']);
+            Route::post('/activity-logs/clean', [ActivityLogController::class, 'clean']);
         });
     });
 });

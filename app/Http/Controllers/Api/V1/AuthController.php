@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api\V1;
 
 use App\Http\Controllers\Controller;
 use App\Models\User;
+use App\Services\ActivityLogService;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Hash;
@@ -12,6 +13,10 @@ use Illuminate\Validation\ValidationException;
 
 class AuthController extends Controller
 {
+    public function __construct(
+        private ActivityLogService $logger
+    ) {}
+
     /**
      * Register a new user
      */
@@ -76,6 +81,15 @@ class AuthController extends Controller
         $user = User::where('email', $request->email)->first();
 
         if (!$user || !Hash::check($request->password, $user->password)) {
+            // Log failed login
+            $this->logger->log(
+                'login_failed',
+                null,
+                "Đăng nhập thất bại cho: {$request->email}",
+                [],
+                'warning',
+                ['authentication', 'security']
+            );
             throw ValidationException::withMessages([
                 'email' => ['The provided credentials are incorrect.'],
             ]);
@@ -85,6 +99,16 @@ class AuthController extends Controller
         // $user->tokens()->delete();
 
         $token = $user->createToken('auth-token')->plainTextToken;
+
+        // Log successful login
+        $this->logger->setUserId($user->id)->log(
+            'login',
+            null,
+            "Người dùng {$user->name} đăng nhập",
+            [],
+            'info',
+            ['authentication']
+        );
 
         return response()->json([
             'success' => true,
@@ -101,7 +125,19 @@ class AuthController extends Controller
      */
     public function logout(Request $request): JsonResponse
     {
-        $request->user()->currentAccessToken()->delete();
+        $user = $request->user();
+
+        // Log logout before deleting token
+        $this->logger->setUserId($user->id)->log(
+            'logout',
+            null,
+            "Người dùng {$user->name} đăng xuất",
+            [],
+            'info',
+            ['authentication']
+        );
+
+        $user->currentAccessToken()->delete();
 
         return response()->json([
             'success' => true,
@@ -207,6 +243,16 @@ class AuthController extends Controller
         $user->update([
             'password' => Hash::make($request->password),
         ]);
+
+        // Log password change
+        $this->logger->setUserId($user->id)->log(
+            'password_changed',
+            $user,
+            "Người dùng {$user->name} thay đổi mật khẩu",
+            [],
+            'notice',
+            ['authentication', 'security']
+        );
 
         return response()->json([
             'success' => true,
